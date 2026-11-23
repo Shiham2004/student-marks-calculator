@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Marks &amp; Grade Calculator</title>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    /* ------------------------------------------------------------------
+       Student Marks & Grade Calculator
+       Pure HTML + JavaScript (no CSS files, no <style> tags, no libraries).
+       All visual styling is applied through JavaScript (element.style).
+    ------------------------------------------------------------------ */
+
+    // ---------- Design tokens ----------
+    const C = {
+      page: "#f3efe6",
+      ink: "#1c2433",
+      muted: "#6b6558",
+      line: "#ddd5c3",
+      panel: "#fffdf8",
+      soft: "#f7f2e7",
+      brand: "#1f3a5f",
+      brandDark: "#142640",
+      accent: "#b8922e",
+      danger: "#b42318",
+      dangerBg: "#fef3f2",
+      okBg: "#e8f6ef",
+      ok: "#13694a"
+    };
+    const FONT = "Georgia, 'Times New Roman', serif";
+    const GRADE_COLORS = {
+      A: ["#d9f3e4", "#13694a"],
+      B: ["#dbeafe", "#1d4ed8"],
+      C: ["#fef3c7", "#92400e"],
+      S: ["#ffe8d1", "#b45309"],
+      F: ["#fde2e0", "#b42318"],
+      "-": ["#eef2f1", "#7a8c92"]
+    };
+
+    // ---------- Data ----------
+    const SUBJECTS = ["Machine Learning", "Computer Network", "Architecture"];
+    const COURSES = ["HNDIT", "HNDA", "HNDE"];
+    const GENDERS = ["Male", "Female"];
+
+    // State is kept so the form is preserved when pressing Back
+    const state = { name: "", gender: "", course: "", marks: ["", "", ""] };
+
+    // ---------- Helpers ----------
+    function el(tag, styles, props, children) {
+      const node = document.createElement(tag);
+      if (styles) Object.assign(node.style, styles);
+      if (props) Object.assign(node, props);
+      (children || []).forEach(function (c) {
+        node.append(c);
+      });
+      return node;
+    }
+
+    function getGrade(mark) {
+      if (mark === "" || isNaN(mark)) return "-";
+      if (mark >= 75) return "A";
+      if (mark >= 65) return "B";
+      if (mark >= 50) return "C";
+      if (mark >= 35) return "S";
+      return "F";
+    }
+
+    function badge(grade) {
+      const colors = GRADE_COLORS[grade];
+      return el("span", {
+        display: "inline-block",
+        minWidth: "34px",
+        padding: "4px 10px",
+        borderRadius: "999px",
+        textAlign: "center",
+        fontWeight: "700",
+        background: colors[0],
+        color: colors[1]
+      }, { textContent: grade });
+    }
+
+    function button(label, onClick, secondary) {
+      const b = el("button", {
+        padding: "13px 34px",
+        border: secondary ? "2px solid " + C.brand : "2px solid " + C.brand,
+        borderRadius: "12px",
+        background: secondary ? "transparent" : C.brand,
+        color: secondary ? C.brand : "#fff",
+        fontFamily: FONT,
+        fontSize: "16px",
+        fontWeight: "700",
+        cursor: "pointer",
+        transition: "transform .15s, background .15s"
+      }, { type: "button", textContent: label, onclick: onClick });
+      b.onmouseenter = function () { b.style.transform = "translateY(-2px)"; };
+      b.onmouseleave = function () { b.style.transform = "none"; };
+      b.onfocus = function () { b.style.outline = "3px solid " + C.accent; b.style.outlineOffset = "2px"; };
+      b.onblur = function () { b.style.outline = "none"; };
+      return b;
+    }
+
+    function label(text) {
+      return el("div", { fontWeight: "700", margin: "26px 0 10px", color: C.ink }, { textContent: text });
+    }
+
+    // Pill-style radio group (used for Gender and Course)
+    function pillGroup(name, options, current, onChange) {
+      const wrap = el("div", { display: "flex", flexWrap: "wrap", gap: "10px" });
+      const items = [];
+
+      function paint() {
+        items.forEach(function (it) {
+          const on = it.input.checked;
+          it.pill.style.background = on ? C.brand : C.soft;
+          it.pill.style.color = on ? "#fff" : C.ink;
+          it.pill.style.borderColor = on ? C.brand : C.line;
+        });
+      }
+
+      options.forEach(function (opt) {
+        const input = el("input", { position: "absolute", opacity: "0", width: "1px", height: "1px" },
+          { type: "radio", name: name, value: opt, checked: current === opt });
+        const pill = el("label", {
+          position: "relative",
+          padding: "10px 20px",
+          border: "2px solid " + C.line,
+          borderRadius: "999px",
+          cursor: "pointer",
+          fontWeight: "600",
+          transition: "background .15s, color .15s"
+        }, null, [input, opt]);
+        input.onchange = function () { paint(); onChange(opt); };
+        input.onfocus = function () { pill.style.boxShadow = "0 0 0 3px " + C.accent; };
+        input.onblur = function () { pill.style.boxShadow = "none"; };
+        items.push({ input: input, pill: pill });
+        wrap.append(pill);
+      });
+      paint();
+      return wrap;
+    }
+
+    // ---------- Page shell ----------
+    document.documentElement.style.background = C.page;
+    Object.assign(document.body.style, {
+      margin: "0",
+      minHeight: "100vh",
+      background: C.page,
+      fontFamily: FONT,
+      color: C.ink
+    });
+    Object.assign(document.getElementById("app").style, {
+      maxWidth: "720px",
+      margin: "0 auto",
+      padding: "clamp(12px, 4vw, 40px)",
+      boxSizing: "border-box"
+    });
+
+    function card(headerTitle, headerSub, bodyNodes) {
+      const header = el("div", {
+        background: "linear-gradient(135deg, " + C.brandDark + ", " + C.brand + ")",
+        color: "#fff",
+        padding: "28px clamp(18px, 5vw, 36px)",
+        borderBottom: "6px solid " + C.accent
+      }, null, [
+        el("div", { fontSize: "clamp(22px, 5vw, 30px)", fontWeight: "800", letterSpacing: "0.3px" }, { textContent: headerTitle }),
+        el("div", { marginTop: "6px", opacity: "0.85", fontSize: "15px" }, { textContent: headerSub })
+      ]);
+      const body = el("div", { padding: "8px clamp(18px, 5vw, 36px) 34px" }, null, bodyNodes);
+      return el("div", {
+        background: C.panel,
+        borderRadius: "22px",
+        overflow: "hidden",
+        boxShadow: "0 18px 50px rgba(20, 38, 64, 0.18)"
+      }, null, [header, body]);
+    }
+
+    function mount(node) {
+      const app = document.getElementById("app");
+      app.replaceChildren(node);
+      window.scrollTo(0, 0);
+    }
+
+    // ---------- Form view ----------
+    function showForm() {
+      const message = el("div", {
+        display: "none",
+        margin: "20px 0 0",
+        padding: "12px 16px",
+        borderRadius: "12px",
+        background: C.dangerBg,
+        color: C.danger,
+        fontWeight: "600"
+      }, { role: "alert" });
+
+      function showError(text) {
+        message.textContent = text;
+        message.style.display = "block";
+      }
+
+      // Name
+      const nameInput = el("input", {
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "14px 16px",
+        border: "2px solid " + C.line,
+        borderRadius: "12px",
+        background: C.soft,
+        fontFamily: FONT,
+        fontSize: "16px",
+        color: C.ink,
+        outline: "none"
+      }, { type: "text", placeholder: "Enter student name", value: state.name, autocomplete: "off" });
+      nameInput.onfocus = function () { nameInput.style.borderColor = C.brand; };
+      nameInput.onblur = function () { nameInput.style.borderColor = C.line; };
+      nameInput.oninput = function () { state.name = nameInput.value; };
+
+      // Marks grid (div-based so it adapts to small screens)
+      const gridCols = "minmax(120px, 1.6fr) minmax(90px, 1fr) 70px";
+      const gridRow = function (extra) {
+        return Object.assign({
+          display: "grid",
+          gridTemplateColumns: gridCols,
+          gap: "10px",
+          alignItems: "center",
+          padding: "12px 14px"
+        }, extra || {});
+      };
+
+      const grid = el("div", {
+        border: "2px solid " + C.line,
+        borderRadius: "16px",
+        overflow: "hidden"
+      });
+
+      grid.append(el("div", gridRow({ background: C.soft, fontWeight: "700", fontSize: "14px", color: C.muted }), null, [
+        el("div", null, { textContent: "Subject" }),
+        el("div", null, { textContent: "Marks (0-100)" }),
+        el("div", { textAlign: "center" }, { textContent: "Grade" })
+      ]));
+
+      const gradeCells = [];
+      const avgCell = el("div", { textAlign: "center", fontWeight: "700" }, { textContent: "-" });
+
+      function refreshLive() {
+        const filled = state.marks.every(function (m) { return m !== ""; });
+        gradeCells.forEach(function (cell, i) {
+          const m = state.marks[i];
+          cell.replaceChildren(badge(m === "" ? "-" : getGrade(Number(m))));
+        });
+        if (filled) {
+          const avg = state.marks.reduce(function (s, m) { return s + Number(m); }, 0) / state.marks.length;
+          avgCell.textContent = avg.toFixed(2);
+        } else {
+          avgCell.textContent = "-";
+        }
+      }
+
+      SUBJECTS.forEach(function (subject, i) {
+        const input = el("input", {
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "10px 12px",
+          border: "2px solid " + C.line,
+          borderRadius: "10px",
+          fontFamily: FONT,
+          fontSize: "16px",
+          color: C.ink,
+          outline: "none"
+        }, { type: "number", min: "0", max: "100", step: "any", inputMode: "decimal", placeholder: "0-100", value: state.marks[i] });
+        input.setAttribute("aria-label", subject + " marks");
+        input.onfocus = function () { input.style.borderColor = C.brand; };
+        input.onblur = function () { input.style.borderColor = C.line; };
+        input.oninput = function () {
+          state.marks[i] = input.value;
+          refreshLive();
+        };
+        const gradeCell = el("div", { textAlign: "center" });
+        gradeCells.push(gradeCell);
+
+        grid.append(el("div", gridRow({ borderTop: "1px solid " + C.line }), null, [
+          el("div", { fontWeight: "600" }, { textContent: subject }),
+          input,
+          gradeCell
+        ]));
+      });
+
+      grid.append(el("div", gridRow({ borderTop: "1px solid " + C.line, background: C.soft, fontWeight: "700" }), null, [
+        el("div", { gridColumn: "1 / 3" }, { textContent: "Average" }),
+        avgCell
+      ]));
+      refreshLive();
+
+      // Submit
+      function calculate() {
+        message.style.display = "none";
+        const name = state.name.trim();
+        if (!name) return showError("Enter the student's name.");
+        if (!/^[A-Za-z\u0080-\uFFFF .'-]+$/.test(name)) return showError("The name can only contain letters and spaces.");
+        if (!state.gender) return showError("Select a gender.");
+        if (!state.course) return showError("Select a course.");
+        for (let i = 0; i < SUBJECTS.length; i++) {
+          const raw = state.marks[i];
+          if (raw === "") return showError("Enter marks for " + SUBJECTS[i] + ".");
+          const n = Number(raw);
+          if (isNaN(n) || n < 0 || n > 100) return showError("Marks for " + SUBJECTS[i] + " must be between 0 and 100.");
+        }
+        state.name = name;
+        showResults();
+      }
+
+      const actions = el("div", { display: "flex", justifyContent: "center", gap: "12px", marginTop: "26px", flexWrap: "wrap" }, null, [
+        button("Calculate", calculate),
+        button("Clear", function () {
+          state.name = ""; state.gender = ""; state.course = ""; state.marks = ["", "", ""];
+          showForm();
+        }, true)
+      ]);
+
+      // Enter key submits
+      document.onkeydown = function (e) {
+        if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "radio") calculate();
+      };
+
+      mount(card("Student Marks Calculator", "Enter the details and marks to see grades instantly.", [
+        label("Name"),
+        nameInput,
+        label("Gender"),
+        pillGroup("gender", GENDERS, state.gender, function (v) { state.gender = v; }),
+        label("Course"),
+        pillGroup("course", COURSES, state.course, function (v) { state.course = v; }),
+        el("div", { height: "26px" }),
+        grid,
+        message,
+        actions
+      ]));
+    }
+
+    // ---------- Results view ----------
+    function showResults() {
+      document.onkeydown = null;
+      const marks = state.marks.map(Number);
+      const total = marks.reduce(function (s, m) { return s + m; }, 0);
+      const max = marks.length * 100;
+      const avg = total / marks.length;
+      const overall = getGrade(avg);
+
+      const initials = state.name.split(/\s+/).filter(Boolean).slice(0, 2)
+        .map(function (w) { return w[0].toUpperCase(); }).join("");
+
+      const profile = el("div", { display: "flex", alignItems: "center", gap: "16px", margin: "26px 0 8px", flexWrap: "wrap" }, null, [
+        el("div", {
+          width: "64px", height: "64px", borderRadius: "50%",
+          background: C.accent, color: C.ink,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "24px", fontWeight: "800", flexShrink: "0"
+        }, { textContent: initials }),
+        el("div", null, null, [
+          el("div", { fontSize: "22px", fontWeight: "800" }, { textContent: state.name }),
+          el("div", { color: C.muted, marginTop: "4px" }, { textContent: state.gender + " | " + state.course })
+        ])
+      ]);
+
+      const cols = "minmax(120px, 1.6fr) minmax(70px, 1fr) 70px";
+      const rowStyle = function (extra) {
+        return Object.assign({
+          display: "grid", gridTemplateColumns: cols, gap: "10px",
+          alignItems: "center", padding: "13px 14px"
+        }, extra || {});
+      };
+
+      const table = el("div", { border: "2px solid " + C.line, borderRadius: "16px", overflow: "hidden", marginTop: "18px" });
+      table.append(el("div", rowStyle({ background: C.soft, fontWeight: "700", fontSize: "14px", color: C.muted }), null, [
+        el("div", null, { textContent: "Subject" }),
+        el("div", null, { textContent: "Marks" }),
+        el("div", { textAlign: "center" }, { textContent: "Grade" })
+      ]));
+      SUBJECTS.forEach(function (s, i) {
+        table.append(el("div", rowStyle({ borderTop: "1px solid " + C.line }), null, [
+          el("div", { fontWeight: "600" }, { textContent: s }),
+          el("div", null, { textContent: String(marks[i]) }),
+          el("div", { textAlign: "center" }, null, [badge(getGrade(marks[i]))])
+        ]));
+      });
+      table.append(el("div", rowStyle({ borderTop: "1px solid " + C.line, background: C.soft, fontWeight: "700" }), null, [
+        el("div", null, { textContent: "Average" }),
+        el("div", null, { textContent: avg.toFixed(2) }),
+        el("div", { textAlign: "center" }, null, [badge(overall)])
+      ]));
+
+      const totalLine = el("div", { textAlign: "center", margin: "24px 0 14px", fontSize: "18px", fontWeight: "700" }, {
+        textContent: "Total marks: " + total + " / " + max
+      });
+
+      const success = el("div", {
+        textAlign: "center", padding: "12px 16px", borderRadius: "12px",
+        background: C.okBg, color: C.ok, fontWeight: "600"
+      }, { textContent: state.name + "\u2019s results were calculated successfully." });
+
+      const actions = el("div", { display: "flex", justifyContent: "center", gap: "12px", marginTop: "26px", flexWrap: "wrap" }, null, [
+        button("Back", showForm),
+        button("Print", function () { window.print(); }, true)
+      ]);
+
+      mount(card("Student Marks & Grade Calculator", "Student results", [profile, table, totalLine, success, actions]));
+    }
+
+    // ---------- Start ----------
+    showForm();
+  </script>
+</body>
+</html>
